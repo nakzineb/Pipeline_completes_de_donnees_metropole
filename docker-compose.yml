@@ -1,0 +1,264 @@
+version: '3.8'
+
+# =================================================================
+# DOCKER COMPOSE - PIPELINE VELIB
+# =================================================================
+# Services : Zookeeper, Kafka, PostgreSQL, Airflow, ClickHouse
+# =================================================================
+
+# -----------------------------------------------------------------
+# NETWORKS
+# -----------------------------------------------------------------
+# On crée un réseau partagé pour que tous les containers puissent communiquer
+networks:
+  velib-network:
+    driver: bridge
+
+# -----------------------------------------------------------------
+# VOLUMES
+# -----------------------------------------------------------------
+# Volumes persistants pour conserver les données même après redémarrage
+volumes:
+  postgres-db-volume: # Base de données Airflow
+  kafka-data: # Messages Kafka
+  zookeeper-data: # Métadonnées Zookeeper
+  zookeeper-logs: # Logs Zookeeper
+  clickhouse-data: # Données ClickHouse
+  airflow-logs:
+    # Logs Airflow
+
+    # -----------------------------------------------------------------
+    # SERVICES
+    # -----------------------------------------------------------------
+services:
+
+  # ===============================================================
+  # ZOOKEEPER - Coordination pour Kafka
+  # ===============================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    hostname: zookeeper
+    networks:
+      - velib-network
+    ports:
+      - "2181:2181"
+    environment:
+      # EXPLICATION : Zookeeper gère la coordination du cluster Kafka
+      # Il stocke les métadonnées (quels brokers sont actifs, etc.)
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "2181" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===============================================================
+  # KAFKA - Système de streaming
+  # ===============================================================
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    hostname: kafka
+    networks:
+      - velib-network
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      # EXPLICATION : Configuration du broker Kafka
+      # - BROKER_ID : identifiant unique du broker
+      # - ZOOKEEPER_CONNECT : où trouver Zookeeper
+      # - LISTENERS : sur quels ports écouter
+      # - ADVERTISED_LISTENERS : comment les clients doivent se connecter
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      # Configuration de rétention des messages
+      KAFKA_LOG_RETENTION_HOURS: 168 # 7 jours
+      KAFKA_LOG_RETENTION_BYTES: 1073741824 # 1GB
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # ===============================================================
+  # POSTGRESQL - Base de données pour Airflow
+  # ===============================================================
+  postgres:
+    image: postgres:15
+    container_name: postgres-airflow
+    networks:
+      - velib-network
+    environment:
+      # EXPLICATION : PostgreSQL stocke les métadonnées d'Airflow
+      # (historique des DAGs, status des tasks, etc.)
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "airflow" ]
+      interval: 5s
+      retries: 5
+
+  # ===============================================================
+  # AIRFLOW WEBSERVER - Interface web
+  # ===============================================================
+  airflow-webserver:
+    image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.8.0-python3.11}
+    container_name: airflow-webserver
+    networks:
+      - velib-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # EXPLICATION : Le webserver fournit l'interface utilisateur
+      # On peut voir les DAGs, leur status, les logs, etc.
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+      _PIP_ADDITIONAL_REQUIREMENTS: kafka-python clickhouse-connect requests
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./velib_kafka:/opt/airflow/velib_kafka # Pour accéder aux scripts Kafka
+    ports:
+      - "8080:8080"
+    command: >
+      bash -c "airflow db init &&
+               airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin &&
+               airflow webserver"
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ===============================================================
+  # AIRFLOW SCHEDULER - Planificateur de tâches
+  # ===============================================================
+  airflow-scheduler:
+    image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.8.0-python3.11}
+    container_name: airflow-scheduler
+    networks:
+      - velib-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-webserver:
+        condition: service_healthy
+    environment:
+      # EXPLICATION : Le scheduler surveille les DAGs et déclenche les tasks
+      # au bon moment selon leur schedule_interval
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      _PIP_ADDITIONAL_REQUIREMENTS: kafka-python clickhouse-connect requests
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./velib_kafka:/opt/airflow/velib_kafka
+    command: scheduler
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"' ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ===============================================================
+  # CLICKHOUSE - Data Warehouse
+  # ===============================================================
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    hostname: clickhouse
+    networks:
+      - velib-network
+    ports:
+      - "8123:8123" # HTTP port
+      - "9000:9000" # Native port
+    environment:
+      # EXPLICATION : ClickHouse est notre data warehouse
+      # Il stocke toutes les données temps réel pour l'analyse
+      CLICKHOUSE_DB: velib_db
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse123
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/init:/docker-entrypoint-initdb.d # Scripts d'init
+    ulimits:
+      # ClickHouse a besoin de plus de fichiers ouverts
+      nofile:
+        soft: 262144
+        hard: 262144
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8123/ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# =================================================================
+# FIN DU FICHIER
+# =================================================================
+#
+# COMMENT UTILISER :
+#
+# 1. Démarrer tous les services :
+#    docker-compose up -d
+#
+# 2. Vérifier le status :
+#    docker-compose ps
+#
+# 3. Voir les logs :
+#    docker-compose logs -f [service_name]
+#
+# 4. Arrêter tous les services :
+#    docker-compose down
+#
+# 5. Tout supprimer (y compris les volumes) :
+#    docker-compose down -v
+#
+# ACCÈS AUX SERVICES :
+# - Airflow UI : http://localhost:8080 (admin/admin)
+# - ClickHouse : http://localhost:8123
+# - Kafka : localhost:9092
+# - PostgreSQL : localhost:5432
+#
+# =================================================================
