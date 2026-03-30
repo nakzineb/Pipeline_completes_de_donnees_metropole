@@ -1,0 +1,347 @@
+{
+    "annotations": {
+        "list": []
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+        {
+            "title": "Messages Produits (rate/min)",
+            "description": "Taux de messages produits par le producer vers Kafka",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PBFA97CFB590B2093"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 20,
+                        "gradientMode": "scheme",
+                        "showPoints": "auto",
+                        "pointSize": 5
+                    },
+                    "unit": "ops"
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "rate(velib_messages_produced_total{status=\"success\"}[1m]) * 60",
+                    "legendFormat": "{{topic}} - success",
+                    "refId": "A"
+                },
+                {
+                    "expr": "rate(velib_messages_produced_total{status=\"error\"}[1m]) * 60",
+                    "legendFormat": "{{topic}} - error",
+                    "refId": "B"
+                }
+            ]
+        },
+        {
+            "title": "Messages Consommés (rate/min)",
+            "description": "Taux de messages consommés depuis Kafka",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 0
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PBFA97CFB590B2093"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 20,
+                        "gradientMode": "scheme"
+                    },
+                    "unit": "ops"
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "rate(velib_messages_consumed_total[1m]) * 60",
+                    "legendFormat": "{{topic}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "title": "Lignes Insérées dans ClickHouse (rate/min)",
+            "description": "Taux d'insertion dans les tables ClickHouse",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 8
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PBFA97CFB590B2093"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 15,
+                        "gradientMode": "scheme"
+                    },
+                    "unit": "ops"
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "rate(velib_rows_inserted_total[1m]) * 60",
+                    "legendFormat": "{{table}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "title": "Erreurs Pipeline",
+            "description": "Erreurs API et erreurs d'insertion ClickHouse",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 8
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PBFA97CFB590B2093"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 30,
+                        "gradientMode": "scheme",
+                        "thresholdsStyle": {
+                            "mode": "line"
+                        }
+                    },
+                    "unit": "ops",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 1
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "rate(velib_api_errors_total[1m]) * 60",
+                    "legendFormat": "API errors - {{endpoint}}",
+                    "refId": "A"
+                },
+                {
+                    "expr": "rate(velib_insertion_errors_total[1m]) * 60",
+                    "legendFormat": "Insert errors - {{table}}",
+                    "refId": "B"
+                }
+            ]
+        },
+        {
+            "title": "Taille des Buffers",
+            "description": "Nombre de messages en attente dans les buffers du consumer",
+            "type": "gauge",
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 0,
+                "y": 16
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PBFA97CFB590B2093"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 50
+                            },
+                            {
+                                "color": "red",
+                                "value": 90
+                            }
+                        ]
+                    },
+                    "min": 0,
+                    "max": 100
+                },
+                "overrides": []
+            },
+            "options": {
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true
+            },
+            "targets": [
+                {
+                    "expr": "velib_buffer_size",
+                    "legendFormat": "{{buffer_type}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "title": "Latence API Vélib' (secondes)",
+            "description": "Temps de réponse de l'API Vélib' - percentiles",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 16,
+                "x": 8,
+                "y": 16
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PBFA97CFB590B2093"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 10
+                    },
+                    "unit": "s"
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "histogram_quantile(0.50, rate(velib_api_response_seconds_bucket[5m]))",
+                    "legendFormat": "p50",
+                    "refId": "A"
+                },
+                {
+                    "expr": "histogram_quantile(0.95, rate(velib_api_response_seconds_bucket[5m]))",
+                    "legendFormat": "p95",
+                    "refId": "B"
+                },
+                {
+                    "expr": "histogram_quantile(0.99, rate(velib_api_response_seconds_bucket[5m]))",
+                    "legendFormat": "p99",
+                    "refId": "C"
+                }
+            ]
+        }
+    ],
+    "refresh": "10s",
+    "schemaVersion": 39,
+    "tags": [
+        "velib",
+        "pipeline",
+        "monitoring"
+    ],
+    "templating": {
+        "list": []
+    },
+    "time": {
+        "from": "now-1h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "Europe/Paris",
+    "title": "Pipeline Vélib' - Monitoring",
+    "uid": "velib-pipeline-dashboard",
+    "version": 1
+}

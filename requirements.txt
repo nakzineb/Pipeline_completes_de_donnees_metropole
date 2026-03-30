@@ -1,59 +1,18 @@
-# =================================================================
-# DÉPENDANCES PYTHON - PROJET VELIB PIPELINE
-# =================================================================
+# ===========================================
+# Pipeline Vélib' - Dépendances Python
+# ===========================================
 
-# -----------------------------------------------------------------
-# Kafka
-# -----------------------------------------------------------------
-kafka-python==2.0.2          # Client Python pour Apache Kafka
-                             # Permet de produire et consommer des messages
+# --- Core Pipeline ---
+kafka-python-ng==2.2.3
+clickhouse-connect==0.7.19
+requests==2.31.0
 
-# -----------------------------------------------------------------
-# ClickHouse
-# -----------------------------------------------------------------
-clickhouse-connect==0.7.0    # Client Python pour ClickHouse
-                             # Pour insérer et requêter les données
+# --- Monitoring ---
+prometheus_client==0.21.0
 
-# -----------------------------------------------------------------
-# HTTP & API
-# -----------------------------------------------------------------
-requests==2.31.0             # Bibliothèque HTTP pour appeler l'API Vélib'
-urllib3==2.1.0               # Gestion des requêtes HTTP (dépendance de requests)
+# --- Testing ---
+pytest==8.3.4
+pytest-cov==6.0.0
 
-# -----------------------------------------------------------------
-# Data Processing
-# -----------------------------------------------------------------
-pandas==2.1.4                # Manipulation de données (optionnel mais utile)
-                             # Pratique pour transformer les données avant insert
-
-# -----------------------------------------------------------------
-# Airflow (déjà inclus dans l'image Docker, mais listé pour référence)
-# -----------------------------------------------------------------
-# apache-airflow==2.8.0
-# apache-airflow-providers-apache-kafka==1.3.0
-
-# -----------------------------------------------------------------
-# Utilitaires
-# -----------------------------------------------------------------
-python-dotenv==1.0.0         # Charger les variables depuis .env
-pytz==2023.3                 # Gestion des timezones
-
-# -----------------------------------------------------------------
-# Développement & Tests (optionnel)
-# -----------------------------------------------------------------
-pytest==7.4.3                # Framework de tests
-pytest-cov==4.1.0            # Couverture de tests
-black==23.12.1               # Formattage de code
-flake8==7.0.0                # Linter Python
-
-# =================================================================
-# INSTALLATION
-# =================================================================
-# 
-# Pour installer toutes les dépendances :
-# pip install -r requirements.txt
-# 
-# Ou avec des droits admin si nécessaire :
-# pip install -r requirements.txt --break-system-packages
-# 
-# =================================================================
+# --- Linting ---
+ruff==0.8.6

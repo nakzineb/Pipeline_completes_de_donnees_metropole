@@ -1,0 +1,20 @@
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501", # line too long (on gère avec line-length=120)
+    "F841", # local variable assigned but never used (utile dans les tests)
+    "E722", # bare except (on en a quelques-uns volontairement)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F811"] # redefined-while-unused (fixtures pytest)
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"

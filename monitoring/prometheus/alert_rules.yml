@@ -1,0 +1,63 @@
+# =================================================================
+# PROMETHEUS - Règles d'alerte
+# =================================================================
+
+groups:
+  - name: velib_pipeline_alerts
+    rules:
+
+      # ----------------------------------------------------------
+      # ALERTE 1 : Producteur inactif
+      # Aucun message produit depuis 5 minutes
+      # ----------------------------------------------------------
+      - alert: ProducerInactive
+        expr: rate(velib_messages_produced_total{status="success"}[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Producteur Vélib' inactif"
+          description: "Aucun message n'a été produit vers Kafka depuis 5 minutes. Vérifiez le producteur et l'API Vélib'."
+
+      # ----------------------------------------------------------
+      # ALERTE 2 : Consommateur inactif
+      # Aucun message consommé depuis 5 minutes
+      # ----------------------------------------------------------
+      - alert: ConsumerInactive
+        expr: rate(velib_messages_consumed_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consommateur Vélib' inactif"
+          description: "Aucun message n'a été consommé depuis Kafka depuis 5 minutes. Vérifiez le consommateur et Kafka."
+
+      # ----------------------------------------------------------
+      # ALERTE 3 : Taux d'erreurs élevé
+      # Plus de 10% d'erreurs d'insertion sur 5 minutes
+      # ----------------------------------------------------------
+      - alert: HighErrorRate
+        expr: >
+          (
+            rate(velib_insertion_errors_total[5m])
+            / (rate(velib_rows_inserted_total[5m]) + rate(velib_insertion_errors_total[5m]))
+          ) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Taux d'erreurs d'insertion élevé"
+          description: "Le taux d'erreurs d'insertion dans ClickHouse dépasse 10% depuis 2 minutes. Vérifiez ClickHouse et les données."
+
+      # ----------------------------------------------------------
+      # ALERTE 4 : API Vélib' inaccessible
+      # Pas d'appel API réussi depuis 5 minutes
+      # ----------------------------------------------------------
+      - alert: APIDown
+        expr: rate(velib_api_calls_total[5m]) == 0 or rate(velib_api_errors_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API Vélib' potentiellement inaccessible"
+          description: "Pas d'appel API réussi ou erreurs API continues depuis 5 minutes. Vérifiez la connectivité réseau et l'API Vélib'."

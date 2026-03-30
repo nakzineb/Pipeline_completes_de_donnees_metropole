@@ -1,0 +1,31 @@
+# =================================================================
+# PROMETHEUS - Configuration
+# =================================================================
+
+global:
+  scrape_interval: 15s        # Scrape toutes les 15 secondes
+  evaluation_interval: 15s    # Évaluer les règles toutes les 15 secondes
+
+# Charger les règles d'alerte
+rule_files:
+  - /etc/prometheus/alert_rules.yml
+
+# Configuration du scraping
+scrape_configs:
+
+  # Prometheus se scrape lui-même (santé du service)
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Métriques du producteur Kafka Vélib'
+  - job_name: 'velib-producer'
+    static_configs:
+      - targets: ['velib-producer:8000']
+    scrape_interval: 10s
+
+  # Métriques du consommateur Kafka Vélib'
+  - job_name: 'velib-consumer'
+    static_configs:
+      - targets: ['velib-consumer:8001']
+    scrape_interval: 10s
